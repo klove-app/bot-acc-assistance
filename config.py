@@ -1,21 +1,33 @@
+"""
+Конфигурационный файл для Telegram-бота с интеграцией Claude AI.
+Содержит основные настройки, константы и сообщения.
+"""
+
 import os
 from dotenv import load_dotenv
 
 # Загружаем переменные окружения
-load_dotenv()
+try:
+    load_dotenv()
+except Exception as e:
+    raise ValueError("Ошибка при загрузке файла .env: {}".format(e))
 
 # Получаем значения из переменных окружения
 TELEGRAM_TOKEN = os.getenv('TELEGRAM_TOKEN')
 ANTHROPIC_API_KEY = os.getenv('ANTHROPIC_API_KEY')
+PAYMENT_PROVIDER_TOKEN = os.getenv('PAYMENT_PROVIDER_TOKEN')
 
 # Проверка наличия переменных
-if not TELEGRAM_TOKEN or not ANTHROPIC_API_KEY:
+if not TELEGRAM_TOKEN or not ANTHROPIC_API_KEY or not PAYMENT_PROVIDER_TOKEN:
     raise ValueError("Отсутствуют необходимые переменные окружения")
+
+# Тестовый токен для платежей через Telegram (для разработки)
+# PAYMENT_PROVIDER_TOKEN = '1234567890:TEST:abcdefghijklmnopqrstuvwxyz'
 
 # Настройки бота
 MAX_HISTORY_LENGTH = 10
 CLAUDE_MODEL = "claude-3-5-sonnet-20241022"
-MAX_TOKENS = 4096
+MAX_TOKENS = 15000  # Увеличено под возможности Claude 3.5 Sonnet
 
 # Сообщения бота
 MESSAGES = {

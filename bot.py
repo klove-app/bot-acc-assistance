@@ -3,8 +3,15 @@ from typing import Dict, Any
 import logging
 from datetime import datetime
 import anthropic
-from telegram import Update
-from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes
+from telegram import Update, LabeledPrice, PreCheckoutQuery
+from telegram.ext import (
+    Application, 
+    CommandHandler, 
+    MessageHandler, 
+    PreCheckoutQueryHandler,
+    filters, 
+    ContextTypes
+)
 
 # Импортируем конфигурацию
 from config import *
@@ -127,6 +134,48 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         logger.error(f"Unexpected error: {str(e)}")
         await update.message.reply_text(MESSAGES["error"])
 
+async def send_invoice(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Отправка счета на оплату"""
+    chat_id = update.message.chat_id
+    
+    await context.bot.send_invoice(
+        chat_id=chat_id,
+        title="Консультация бухгалтера",
+        description="Доступ к консультациям бухгалтера на 30 дней",
+        payload="30_days_access",
+        provider_token=PAYMENT_PROVIDER_TOKEN,
+        currency="EUR",
+        prices=[
+            LabeledPrice(label="Месячная подписка", amount=2000)  # 20.00 EUR
+        ],
+        max_tip_amount=1000,
+        suggested_tip_amounts=[100, 200, 300, 400],  # 1-4 EUR чаевые
+        start_parameter="subscription",
+        need_name=True,
+        need_email=True
+    )
+
+async def precheckout_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Обработка предварительной проверки платежа"""
+    query = update.pre_checkout_query
+    
+    try:
+        await query.answer(ok=True)
+    except Exception as e:
+        await query.answer(ok=False, error_message="Извините, произошла ошибка при обработке платежа.")
+        logger.error(f"Ошибка предварительной проверки платежа: {str(e)}")
+
+async def successful_payment_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Обработка успешного платежа"""
+    user_id = update.message.from_user.id
+    
+    # Здесь можно добавить логику активации подписки
+    # Например, сохранение информации о подписке в базе данных
+    
+    await update.message.reply_text(
+        "Спасибо за оплату! Ваша подписка активирована на 30 дней."
+    )
+
 def main() -> None:
     """Запуск бота"""
     try:
@@ -137,6 +186,12 @@ def main() -> None:
         application.add_handler(CommandHandler("start", start))
         application.add_handler(CommandHandler("help", help_command))
         application.add_handler(CommandHandler("clear", clear))
+        
+        # Новые обработчики для платежей
+        application.add_handler(CommandHandler("subscribe", send_invoice))
+        application.add_handler(PreCheckoutQueryHandler(precheckout_callback))
+        application.add_handler(MessageHandler(filters.SUCCESSFUL_PAYMENT, successful_payment_callback))
+        
         application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
 
         # Запускаем бота
